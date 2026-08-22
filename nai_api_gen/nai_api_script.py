@@ -1262,7 +1262,9 @@ class NAIGENScriptBase(scripts.Script):
         self.strength = getattr(p,"denoising_strength",0)
         
         self.model = getattr(p,f'{PREFIX}_'+ 'model',model)
-        self.isV4 = '4' in self.model
+        
+        self.isV5 ='5' in self.model
+        self.isV4 = '4' in self.model or '5' in self.model
         
         if do_local_img2img == 1 or do_local_img2img == 2:
             self.set_local(p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,keep_mask_for_local)
