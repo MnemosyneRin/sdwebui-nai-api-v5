@@ -189,6 +189,10 @@ cached" at a Drive path so your vibe encodings survive between sessions.
 Never put API keys, Civitai keys or HuggingFace tokens directly into notebook
 cells or form fields. Anyone you share the notebook with gets them.
 
+Works on A1111, Forge, ReForge and Forge-Neo. Forge-Neo removed the old
+modules.generation_parameters_copypaste alias that other forks still provide;
+the extension now falls back to modules.infotext_utils there.
+
 
 TROUBLESHOOTING
 ---------------

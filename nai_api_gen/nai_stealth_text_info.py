@@ -1,4 +1,10 @@
-from modules import script_callbacks, shared, generation_parameters_copypaste
+try:
+    from modules import script_callbacks, shared, generation_parameters_copypaste
+except ImportError:
+    # Forge-Neo dropped the back-compat alias for this module; A1111 renamed it
+    # to infotext_utils, and reForge only still works because it aliases the old name.
+    from modules import script_callbacks, shared
+    from modules import infotext_utils as generation_parameters_copypaste
 from modules.script_callbacks import ImageSaveParams
 from modules import images,errors
 from PIL import Image
