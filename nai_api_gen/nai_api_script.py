@@ -422,7 +422,20 @@ class NAIGENScriptBase(scripts.Script):
         return shared.opts.data.get('nai_api_skip_checks', False)
                 
     def get_api_key(self):
-        return shared.opts.data.get('nai_api_key', None)
+        key = shared.opts.data.get('nai_api_key', None)
+        if key: return key
+        # Colab and other throwaway environments lose config.json every session, and
+        # pasting a key into a notebook cell leaks it into the saved output. Fall back
+        # to the environment, then to Colab's Secrets panel.
+        key = os.environ.get('NAI_API_KEY')
+        if key and key.strip(): return key.strip()
+        try:
+            from google.colab import userdata
+            key = userdata.get('NAI_API_KEY')
+            if key and key.strip(): return key.strip()
+        except Exception:
+            pass
+        return None
     
     def connect_api(self):
         s,m = self.subscription_status_message()

@@ -11,7 +11,7 @@ def on_ui_settings():
         if not n in shared.opts.data_labels:
             shared.opts.add_option(n,o)
             
-    addopt('nai_api_key', shared.OptionInfo('', "NAI API Key - See https://docs.sillytavern.app/usage/api-connections/novelai/ ", gr.Textbox, section=section))
+    addopt('nai_api_key', shared.OptionInfo('', "NAI API Key - See https://docs.sillytavern.app/usage/api-connections/novelai/ . Leave blank to use the NAI_API_KEY environment variable, or a Colab secret of that name.", gr.Textbox, section=section))
     
     addopt('nai_api_skip_checks', shared.OptionInfo(False, "Skip NAI account/subscription/Anlas checks.",gr.Checkbox, section=section))
     

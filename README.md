@@ -63,7 +63,11 @@ Checked against NovelAI's current web client:
 ## Your API key
 
 The key is stored by the webui in its own `config.json` under `nai_api_key`, outside this extension's
-folder, and is never written to any file here. Nothing in this repository contains credentials.
+folder, and is never written to any file here.
+
+On Colab or any throwaway environment, leave that field blank and supply the key as an
+environment variable named `NAI_API_KEY`, or as a Colab secret of the same name. That keeps it
+out of notebook cells and saved output. The Settings field takes priority when it is set. Nothing in this repository contains credentials.
 Treat your key like a password: it is tied to your NovelAI account and spends your Anlas.
 
 

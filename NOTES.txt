@@ -169,6 +169,27 @@ A practical habit from heavy users: switch to V4.5 for inpainting to conserve
 V5 allowance.
 
 
+RUNNING ON COLAB
+----------------
+The extension is pure API - no model loading, no CUDA - so it runs anywhere the
+webui does, including Colab. Two things make it less painful there.
+
+Your API key does not have to go in the notebook. Colab wipes config.json every
+session, and pasting a key into a cell leaks it into the saved output. Instead,
+leave the key field in Settings blank and provide it as either:
+  - an environment variable named NAI_API_KEY, or
+  - a Colab secret named NAI_API_KEY (key icon in the left sidebar, with
+    "Notebook access" enabled)
+The Settings field still wins if you fill it in, so local installs are unaffected.
+
+If the notebook mounts Google Drive, point
+Settings > NAI API Generator > "Directory where v4 Vibe Image Encodings are
+cached" at a Drive path so your vibe encodings survive between sessions.
+
+Never put API keys, Civitai keys or HuggingFace tokens directly into notebook
+cells or form fields. Anyone you share the notebook with gets them.
+
+
 TROUBLESHOOTING
 ---------------
 Can't see the new options
