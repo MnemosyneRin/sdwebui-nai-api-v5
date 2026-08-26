@@ -55,8 +55,10 @@ qualPresets = {
     NAIv3f: '{best quality}, {amazing quality}',
     NAIv4: 'no text, best quality, very aesthetic, absurdres',
     NAIv4cp: 'rating:general, best quality, very aesthetic, absurdres',
-    NAIv45: 'location, very aesthetic, masterpiece, no text',
-    NAIv45cp: 'location, masterpiece, no text, -0.8::feet::, rating:general',
+    NAIv45: 'very aesthetic, masterpiece, no text',
+    NAIv45cp: 'masterpiece, no text, -0.8::feet::, rating:general',
+    NAIv5: 'very aesthetic, masterpiece, no text',
+    NAIv5cp: 'masterpiece, no text, -0.8::feet::, rating:general',
 }
 
 v2uc = 'lowres, bad, text, error, missing, extra, fewer, cropped, jpeg artifacts, worst quality, bad quality, watermark, displeasing, unfinished, chromatic aberration, scan, scan artifacts'
@@ -94,6 +96,8 @@ ucPresets = {
     NAIv4cp: [v4cpuc,v4cpucL],
     NAIv45: [v45uc,v45ucL,v45ucFu,v45ucHu],
     NAIv45cp: [v45cpuc,v45cpucL,v45cpucHu],
+    NAIv5: [v45uc,v45ucL,v45ucFu,v45ucHu],
+    NAIv5cp: [v45cpuc,v45cpucL,v45cpucHu],
 }
 
 
@@ -302,7 +306,7 @@ def subscription_status(key):
     return subscription_info(key)[1:]
     
 def subscription_info(key):
-    if not key: return None,-1,False,0,0   
+    if not key: return None,-1,False,0,0
     response = GET(key)
     if response is not None and isinstance(response,requests.exceptions.RequestException):
         print("Subscription Status Check Timed Out, Try Again.")
@@ -315,7 +319,11 @@ def subscription_info(key):
         active = content['active']
         unlimited = active and content['perks']['unlimitedMaxPriority']
         points = content['trainingStepsLeft']['fixedTrainingStepsLeft']+content['trainingStepsLeft']['purchasedTrainingSteps']
-        return content, response.status_code, unlimited, points, content 
+        usage = content['usage']['percent'] if 'usage' in content else 0
+        if usage > 0 and content['usage']['isNegative'] == True:
+            print(f"NAI API: {usage} Usage Is Negative?")
+            usage = 0
+        return content, response.status_code, unlimited, points, usage
     else: print (response, response.json())
     return None,response.status_code,False,0,0
 

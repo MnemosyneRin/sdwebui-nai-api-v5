@@ -140,6 +140,8 @@ class NAIGENScriptBase(scripts.Script):
                     If " Text:" is used inside the prompt, the rest of the prompt (including added styles) will be treated as a text tag<br/>
                     Use "Text:" at the start of a new line to define a text tag that ends at the next line break to prevent this.<br/>
                     <br/>
+                    To use special prompts without new lines, open with "CHAR<<:" and close with ">>CHAR" for characters, or "TEXT<<:" and ">>TEXT" for text <br/>
+                    <br/>
                     By default, sdwebui treats anything after '#' as a comment, which breaks NAI's action tag syntax<br/>
                     Use the configurable Alternate Action Tag ('::' by default, eg 'target::pointing') or disable "Stable Diffusion > Enable Comments"<br/>
                     <br/>
@@ -157,6 +159,9 @@ class NAIGENScriptBase(scripts.Script):
                     &emsp;CHAR:D3:blonde hair<br/>
                     Negative Prompt:<br/>    
                     &emsp;CHAR:2:blue eyes<br/>
+                    
+                    Single Line:                    
+                    &emsp;2girls CHAR<<:B3:black hair>>CHAR CHAR<<:D3:blonde hair>>CHAR<br/>
                     </details>""",
                     dangerously_allow_html=True
                 )
@@ -391,7 +396,7 @@ class NAIGENScriptBase(scripts.Script):
         v3_only_len = len(self.v3_only_ui)
         v4_only_len = len(self.v4_only_ui)
         
-        model.change (fn = lambda mod: [gr.update(visible= '4' in mod or shared.opts.nai_api_use_v4_for_v3), *([gr.update(visible = '4' not in mod)]*v3_only_len), *([gr.update(visible = '4' in mod)]*v4_only_len) ], inputs = [model], outputs=[vibes_v4,*self.v3_only_ui, *self.v4_only_ui] )
+        model.change (fn = lambda mod: [gr.update(visible= 'diffusion-4' in mod or 'diffusion-5' in mod or shared.opts.nai_api_use_v4_for_v3), *([gr.update(visible = '4' not in mod and '5' not in mod)]*v3_only_len), *([gr.update(visible = 'diffusion-4' in mod or 'diffusion-5' in mod )]*v4_only_len) ], inputs = [model], outputs=[vibes_v4,*self.v3_only_ui, *self.v4_only_ui] )
        
         
         for i in range(self.vibe_count_v4):
@@ -420,20 +425,20 @@ class NAIGENScriptBase(scripts.Script):
         key = self.get_api_key()
         if key is None or len(key) < 6: return False
         if skip_sub or self.skip_checks(): return True
-        status, opus, points, max = nai_api.subscription_status(key)
+        status, opus, points, usage = nai_api.subscription_status(key)
         return opus or points > 1   
 
     def subscription_status_message(self):
         key = self.get_api_key()
-        status, opus, points, max = nai_api.subscription_status(key)
-        DEBUG_LOG(f'Subscription Status: {status} {opus} {points} {max}')
+        status, opus, points, usage = nai_api.subscription_status(key)
+        DEBUG_LOG(f'Subscription Status: {status} {opus} {points} {usage}')
         if status == -1: return False,"[ERROR] Missing API Key, enter in Settings > NAI API Generator"
         elif status == 401: return False,"Invalid API Key"
         elif status == 408: return False,"Request Timed out, try again."
         elif status != 200: return False,f"[API ERROR] Error Code: {status}"
         elif not opus and points <=1:
             return True, f'[API ERROR] Insufficient points! {points}'
-        return True, f'[API OK] Anlas:{points} {"Opus" if opus else ""}'
+        return True, f'[API OK] Anlas:{points} {"Opus " + str(usage) +"%" if opus else ""}'
     
     def setup_sampler_name(self,p, nai_sampler,noise_schedule='recommended'):
         noise_schedule_recommended = noise_schedule not in nai_api.noise_schedules
@@ -480,7 +485,7 @@ class NAIGENScriptBase(scripts.Script):
         
     def comment(self, p , c):
         print (c)
-        if p is None or not hasattr(p, "comment"):return        
+        if p is None or not hasattr(p, "comment"):return
         p.comment(c)    
         
     def fail(self, p, c):
@@ -491,6 +496,15 @@ class NAIGENScriptBase(scripts.Script):
         shared.state.interrupt()
     
     def limit_costs(self, p, cost_limiter = True, nai_batch = False, arbitrary_res = False):
+    
+        if not self.skip_checks() and cost_limiter and self.isV5:
+            status, opus, points, usage = nai_api.subscription_status(self.get_api_key())
+            if opus and usage <= 0:
+                self.comment(p,f"Cost Limiter: V5 Usage Depleted, Switching to V4.5.")
+                self.isV5 = False
+                self.isV4 = True
+                self.model = nai_api.NAIv45cp if 'curated' in self.model else nai_api.NAIv45
+            
         MAXSIZE = 1024*1024
         if p.width * p.height > MAXSIZE:
             if not cost_limiter: 
@@ -1199,11 +1213,16 @@ class NAIGENScriptBase(scripts.Script):
             
     def nai_configuration(self,p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,keep_mask_for_local,*args):
         if self.disabled: return        
-        DEBUG_LOG(f'nai_configuration')   
+        DEBUG_LOG(f'nai_configuration')
+        
+        self.model = getattr(p,f'{PREFIX}_'+ 'model',model)
+        
+        self.isV5 = 'diffusion-5' in self.model
+        self.isV4 = 'diffusion-4' in self.model or self.isV5
 
         self.protect_prompts(p)
         
-        self.do_nai_post=nai_post            
+        self.do_nai_post = nai_post
         self.cost_limiter = cost_limiter
         
         self.isimg2img = getattr(p, "init_images",None)
@@ -1260,11 +1279,6 @@ class NAIGENScriptBase(scripts.Script):
         self.cfg = p.cfg_scale
         self.steps = p.steps
         self.strength = getattr(p,"denoising_strength",0)
-        
-        self.model = getattr(p,f'{PREFIX}_'+ 'model',model)
-        
-        self.isV5 ='5' in self.model
-        self.isV4 = '4' in self.model or '5' in self.model
         
         if do_local_img2img == 1 or do_local_img2img == 2:
             self.set_local(p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,keep_mask_for_local)
@@ -1597,6 +1611,13 @@ class NAIGENScriptBase(scripts.Script):
     def parse_tags(self, prompt, neg):
         chars = []        
         def parse(original_prompt, negs):
+        
+            original_prompt = re.sub('CHAR<<:', '\nCHAR:', original_prompt, flags=re.IGNORECASE)
+            original_prompt = re.sub('>>CHAR', '\n:', original_prompt, flags=re.IGNORECASE)
+            
+            original_prompt = re.sub('TEXT<<:', '\nTEXT:', original_prompt, flags=re.IGNORECASE)
+            original_prompt = re.sub('>>TEXT', '\n:', original_prompt, flags=re.IGNORECASE)
+            
             index = 0
             prompt = ""
             text_tag = None
