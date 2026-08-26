@@ -1,2 +1,21 @@
 __pycache__/
 *_custom.py
+
+# Personal vibe-transfer encodings, generated from your own reference images.
+# These are user data, never commit them.
+vibe_encodings/
+
+*.py[cod]
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Nothing in this extension should ever hold credentials - the NovelAI API key
+# lives in the webui's own config.json, outside this folder. These are here so a
+# stray copy can never be committed by accident.
+config.json
+ui-config.json
+*.key
+*.token
+.env

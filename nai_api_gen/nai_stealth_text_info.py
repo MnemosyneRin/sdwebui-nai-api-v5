@@ -276,8 +276,8 @@ def process_nai_geninfo(items):
 
 def add_data_nai(image,text, mode='alpha', compressed=True):    
     binary_data = prepare_data(text, mode, compressed)
-    if mode == 'alpha':
-        image.putalpha(255)
+    if mode == 'alpha' and image.mode != 'RGBA':
+        image.putalpha(255) # only add an alpha channel, never overwrite a transparent one
     width, height = image.size
     pixels = image.load()
     index = 0

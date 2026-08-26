@@ -1,0 +1,199 @@
+================================================================================
+ NOTES - NovelAI Diffusion V5 in this extension
+================================================================================
+
+QUICK START
+-----------
+1. Settings > NAI API Generator > paste your NovelAI API key. The key is stored
+   in the webui's own config.json, never in this extension's folder.
+2. Open the "NAI API Generator" accordion on txt2img or img2img and tick Enable.
+3. Pick nai-diffusion-5-full or nai-diffusion-5-curated from the Model dropdown.
+
+After updating this extension you must RESTART the webui completely. "Reload UI"
+is not enough - the script's argument list changed, and a soft reload can leave
+the old one cached, which errors when you press Generate.
+
+
+V5 SETTINGS - READ THIS FIRST
+-----------------------------
+V5's defaults are NOT V4.5's defaults:
+
+    CFG (guidance)   7      (V4.5 used 5)
+    Steps            23
+    Resolution       832x1216
+    Max CFG          10
+
+If your colours look blown out or oversaturated after switching to V5, check
+your CFG before anything else. This is the single most common complaint and it
+is almost always guidance sitting at 7.
+
+Things V5 simply does not have, which this extension handles for you:
+  - No noise schedule option. V5 is always karras; the dropdown is ignored.
+  - No Variety+ / cfg delay. skip_cfg_above_sigma is never sent.
+  - No SMEA, no Dyn, no Decrisper (dynamic thresholding).
+  - No Vibe Transfer and no Character Reference. NovelAI has not shipped these
+    for V5 yet. If you leave reference images loaded they are dropped with a
+    console warning rather than being sent and rejected.
+  - ddim is not supported; it is mapped to k_euler_ancestral, same as the site.
+
+Prompt budget is much larger than V4.5's 512 tokens:
+    V5 Full      1471 tokens
+    V5 Curated    703 tokens
+V5 switched to a Qwen tokenizer, which is why multi-language prompting works.
+English and Japanese are officially supported. Chinese, German, Spanish and
+Portuguese are reported to work but were not a training focus.
+
+
+ARTIST TAGS AND WEIGHTING
+-------------------------
+Artist tags use the "artist:" prefix, e.g. artist:some_name.
+
+NovelAI's tag suggestion API does not list most artist tags. That does not mean
+they do nothing - it only means they are not suggested. The same is true of many
+characters. If a tag does not autocomplete, test it before assuming it is dead.
+
+NovelAI patched emphasis weighting shortly after V5 launched. Values between
+0 and 1 used to be overwhelmingly strong. Post-fix behaviour, as worked out by
+users, is roughly:
+
+  - Artists carry heavy bias in the 0.51 - 1.0 band and scale proportionally
+    against each other.
+  - 1.0 is full effect. To reduce an artist, step DOWN from 1.0 in 0.1 or 0.05
+    increments. Do not reach for values above 1.0 the way you did on V4.5.
+  - Order within a mix matters on V5. Swapping two artists changes the result.
+
+Old V4.5 mixes generally do not transfer unchanged. Expect to rebuild them.
+
+Year tags shift the era. Solid range is "year 1980" through "year 2026"; 1970-75
+and 1979 exist but are thin, and most pre-1970 years are missing. In furry mode
+only "year 2007" onward exist. There are no decade tags - "1990s", "2000s" and
+similar do not exist. The nearest handle is "retro artstyle".
+
+Match the year to when an artist was actually active. A mismatched year fights
+the style signal, and is a common reason a mix "stops working".
+
+
+CHARACTERS
+----------
+V5 handles far more characters than V4.5's 6. NovelAI's own figures are 22 for
+reliable output, with the web client capping at 32. The API accepts more than 32
+without complaining, but duplicates start appearing well before that.
+
+Character prompt syntax in this extension (see the NAIv4 Syntax help in the UI):
+
+    2girls
+    CHAR:black hair
+    CHAR:D3:blonde hair          <- A1-E5 grid position
+    CHAR:0.25,0.6:red hair       <- exact coordinates, 0 to 1.0
+
+V5 supports freeform positioning, so exact coordinates are the better tool once
+you are past a few characters. Unlike V4.5 you can also position a single
+character. Use '::' instead of '#' for action tags (target::pointing) unless you
+disable Settings > Stable Diffusion > Enable Comments.
+
+Comics work well: put "comic" in the main prompt and position characters, or
+describe the whole page in natural language with no character prompts at all.
+
+
+TEXT
+----
+Build the text block manually, as on V4.5:
+
+    <your prompt> Text: the words you want
+
+V5 handles up to 750 characters of text and renders in multiple languages. You
+can describe the styling - "handwritten" works, and emoji render in bubbles.
+
+
+TRANSPARENT BACKGROUND (V5 only)
+--------------------------------
+Options > "Transparent Background (v5 only)" adds the prompt tag and sets the
+API hint, matching the site's toggle.
+
+Save as PNG. JPEG and WebP discard the alpha channel.
+
+Post-processing that runs after NovelAI returns the image (ADetailer and
+similar) may flatten the transparency. If you use those, turn on
+Settings > NAI API Generator > "Save Original NAI images" so the untouched
+version is written to disk too.
+
+"has alpha" is a separate real tag, reported to control clothing transparency.
+
+
+ENHANCE / UPSCALE - THIS SPENDS ANLAS
+-------------------------------------
+Options > "Enhance/Upscale (COSTS ANLAS)" - Off / 1.5x / 2x / Max, plus a
+Magnitude slider.
+
+This is NOT a button you press on a finished image. While the dropdown is set,
+EVERY generation gets a second pass at the larger size, and every one of those
+passes costs Anlas. It is not covered by the Opus free allowance. Leave it Off
+for normal prompting and switch it on only when you want a specific image
+upscaled.
+
+Measured cost: 832x1216 enhanced to 1.5x cost 27 Anlas.
+
+Magnitude maps to the same strength/noise pairs the website uses:
+
+    1 -> strength 0.20  noise 0.00
+    2 -> strength 0.40  noise 0.00
+    3 -> strength 0.50  noise 0.00   (default, middle)
+    4 -> strength 0.60  noise 0.00
+    5 -> strength 0.70  noise 0.10
+
+Lower magnitude stays closer to the original; higher reinterprets more.
+
+"Max" keeps the source dimensions and asks NovelAI for a detail pass instead of
+a resize. 1.5x and 2x resize and also add the site's own anti-artifact tags.
+
+2x will be SKIPPED at 832x1216. Two times that resolution is 4.05 million pixels
+and NovelAI's ceiling is about 2.52 million - the website does not offer 2x
+there either. You will see a message in the console and the un-enhanced image
+comes through. Use 1.5x or Max at portrait resolution; 2x becomes available from
+smaller sources.
+
+
+OPUS USAGE LIMIT
+----------------
+V5 is not unlimited on Opus the way older models are. You start at 100%, each
+generation ticks it down by an amount that depends on your settings, and it
+refills slowly. You can keep generating past zero by spending Anlas.
+
+To stay inside the free allowance a generation must be at or under 1024x1024
+(1,048,576 pixels), at or under 28 steps, and use no character reference.
+"Force Opus Free Gen Limits" in Options enforces this for you, and will also fall
+back to V4.5 automatically when your V5 usage hits zero. The status line next to
+the API key shows your remaining V5 usage percentage.
+
+A practical habit from heavy users: switch to V4.5 for inpainting to conserve
+V5 allowance.
+
+
+TROUBLESHOOTING
+---------------
+Can't see the new options
+    Restart the webui completely. The Options accordion is also collapsed by
+    default - the new controls are inside it.
+
+500 Internal Server Error on V5
+    NovelAI's V5 backend, not this extension. It is intermittent, and V4.5 will
+    keep working through the same code path while it happens. Raising "Request
+    Retry Attempts" in settings rides it out.
+
+"NAI Stream: server is retrying the request"
+    Normal. NovelAI's own backend retrying. Nothing to do.
+
+429 "Concurrent generation is locked"
+    Another generation is already running on your account, often a browser tab
+    with the NovelAI site open.
+
+Colours look wrong after switching to V5
+    Check CFG. See the V5 SETTINGS section above.
+
+
+A NOTE ON SOURCES
+-----------------
+The API behaviour described here was taken from NovelAI's own web client and
+verified against the live API. The artist weighting bands and some of the
+prompting advice come from community testing after the V5 launch and are best
+treated as a starting calibration rather than published values.

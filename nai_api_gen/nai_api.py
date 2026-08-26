@@ -39,6 +39,8 @@ NAI_AUGMENT_URL = 'https://image.novelai.net/ai/augment-image'
 NAI_STREAM_URL = 'https://image.novelai.net/ai/generate-image-stream'
 
 nai_models = [NAIv5,NAIv5cp,NAIv45,NAIv4f,NAIv45cp,NAIv4cp,NAIv3,NAIv3f,NAIv2]
+v5_models = [NAIv5,NAIv5cp]
+v4_models = [NAIv4cp,NAIv4f,NAIv45cp,NAIv45] + v5_models # models using the v4 prompt format
 
 NAI_SAMPLERS = ["k_euler","k_euler_ancestral","k_dpmpp_2s_ancestral","k_dpmpp_2m","ddim","k_dpmpp_sde","k_dpmpp_2m_sde"]
 noise_schedules = ["exponential","polyexponential","karras","native"]
@@ -56,9 +58,9 @@ qualPresets = {
     NAIv4: 'no text, best quality, very aesthetic, absurdres',
     NAIv4cp: 'rating:general, best quality, very aesthetic, absurdres',
     NAIv45: 'very aesthetic, masterpiece, no text',
-    NAIv45cp: 'masterpiece, no text, -0.8::feet::, rating:general',
+    NAIv45cp: 'very aesthetic, masterpiece, no text, -0.8::feet::, rating:general',
     NAIv5: 'very aesthetic, masterpiece, no text',
-    NAIv5cp: 'masterpiece, no text, -0.8::feet::, rating:general',
+    NAIv5cp: 'very aesthetic, masterpiece, no text',
 }
 
 v2uc = 'lowres, bad, text, error, missing, extra, fewer, cropped, jpeg artifacts, worst quality, bad quality, watermark, displeasing, unfinished, chromatic aberration, scan, scan artifacts'
@@ -88,6 +90,8 @@ v45ucHu = 'lowres, artistic error, film grain, scan artifacts, worst quality, ba
 
 v45ucFu = '{worst quality}, distracting watermark, unfinished, bad quality, {widescreen}, upscale, {sequence}, {{grandfathered content}}, blurred foreground, chromatic aberration, sketch, everyone, [sketch background], simple, [flat colors], ych (character), outline, multiple scenes, [[horror (theme)]], comic'
 
+v5ucL = 'lowres, bad hands, bad anatomy, artistic error, sepia, white haze, worst quality, very displeasing, jpeg artifacts, 0::ai-generated::'
+
 ucPresets = {
     NAIv2: [v2uc,v3ucL],
     NAIv3: [v3uc,v3ucL,v3ucHu],
@@ -96,8 +100,8 @@ ucPresets = {
     NAIv4cp: [v4cpuc,v4cpucL],
     NAIv45: [v45uc,v45ucL,v45ucFu,v45ucHu],
     NAIv45cp: [v45cpuc,v45cpucL,v45cpucHu],
-    NAIv5: [v45uc,v45ucL,v45ucFu,v45ucHu],
-    NAIv5cp: [v45cpuc,v45cpucL,v45cpucHu],
+    NAIv5: [v45uc,v5ucL,v45ucFu,v45ucHu],
+    NAIv5cp: [v45uc,v5ucL,v45ucFu,v45ucHu],
 }
 
 
@@ -213,7 +217,10 @@ def STREAM(key,parameters, preview_func, attempts = 0, timeout = 120, wait_on_42
                             preview_func(dic['image'], dic['step_ix'])       
                         elif dic['event_type'] == 'final': r.files.append(Image.open(BytesIO(dic['image'])))
                         elif dic['event_type'] == 'error': Err(f"Error in NAI Stream: {json.dumps(dic)}")
-                        else: Err(f"Unhandled Event in NAI Stream: {json.dumps(dic)}")
+                        elif dic['event_type'] == 'retry':
+                            r.retry_count += 1
+                            print(f"NAI Stream: server is retrying the request. {dic.get('message','')}")
+                        else: print(f"Unhandled Event in NAI Stream: {json.dumps(dic, default=str)}")
                     except Exception as e: Err(f"Error Unpacking NAI Stream: {e}")
                         
             if content: Err(f"Unread content in NAI stream, Length: {len(content)}")
@@ -739,6 +746,47 @@ def prompt_to_a1111(p):
 
     return out
 
+# "Enhance" on the NAI site: an img2img pass at a larger size. Magnitude 1-5 maps to
+# these strength/noise pairs, and non-max passes get an anti-artifact tag added.
+enhance_magnitudes = [(0.2,0.0),(0.4,0.0),(0.5,0.0),(0.6,0.0),(0.7,0.1)]
+enhance_scales = ["Off","1.5x","2x","Max"]
+enhance_tags = '-2::upscaled, blurry::'
+MAX_ENHANCE_PIXELS = 2516582 # the site won't offer a scale that exceeds this
+
+def enhance_dims(width, height, scale):
+    if scale == 'max': return int(width), int(height)
+    w, h = int(width*scale), int(height*scale)
+    return w - w % 64, h - h % 64
+
+def NAIEnhanceParams(payload, image, scale, magnitude = 3, seed = -1):
+    """Build an Enhance request from the payload that produced `image`."""
+    payload = json.loads(json.dumps(payload)) # cheap deep copy, payload is plain json
+    params = payload['parameters']
+    model = payload.get('model','')
+    scale = 'max' if str(scale).lower().startswith('max') else tryfloat(str(scale).rstrip('xX'), 1.5)
+
+    strength, noise = enhance_magnitudes[min(max(int(magnitude),1),5)-1]
+    width, height = enhance_dims(image.width, image.height, scale)
+
+    if scale == 'max': params['upscaled_enhance'] = True
+    params['width'], params['height'] = width, height
+    params['strength'] = strength
+    params['noise'] = noise
+    params['n_samples'] = 1
+    if seed is not None and seed >= 0:
+        params['seed'] = int(seed)
+        params['extra_noise_seed'] = int(seed)
+    params['image'] = B64Image(image)
+    params.pop('mask', None)
+    payload['action'] = 'img2img'
+
+    # the site only adds these on scaled passes, never on max
+    if scale != 'max' and model in v4_models and enhance_tags not in payload.get('input',''):
+        payload['input'] = f"{payload['input']}, {enhance_tags},"
+        cap = params.get('v4_prompt',{}).get('caption')
+        if cap: cap['base_caption'] = payload['input']
+    return payload
+
 def get_skip_cfg_above_sigma(width,height,model = ''): 
     if model == NAIv45: return 58 * math.pow( width * height / (832 * 1216) , 0.5)
     return 19 * math.pow( width * height / (832 * 1216) , 0.5)
@@ -768,7 +816,7 @@ def AugmentParams(mode, image, width, height, prompt, defry, emotion, seed=-1):
     
     return payload
 
-def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_schedule, dynamic_thresholding= False, sm= False, sm_dyn= False, cfg_rescale=0,uncond_scale =1,model =NAIv3 ,image = None, noise=None, strength=None ,extra_noise_seed=None, mask = None,qualityToggle=False,ucPreset = 2,overlay = False,legacy_v3_extend = False,reference_image = None, reference_information_extracted = None , reference_strength = None,n_samples = 1,variety = False,skip_cfg_above_sigma = None,deliberate_euler_ancestral_bug=None,prefer_brownian=None, characterPrompts = None, text_tag = None, legacy_uc = False,normalize_reference_strength_multiple = False, color_correct = True, director_reference_images = None, director_reference_descriptions = None, director_reference_secondary_strength_values = 1.0, director_reference_strength_values = 1.0, director_reference_information_extracted = None):
+def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_schedule, dynamic_thresholding= False, sm= False, sm_dyn= False, cfg_rescale=0,uncond_scale =1,model =NAIv3 ,image = None, noise=None, strength=None ,extra_noise_seed=None, mask = None,qualityToggle=False,ucPreset = 2,transparent = False,overlay = False,legacy_v3_extend = False,reference_image = None, reference_information_extracted = None , reference_strength = None,n_samples = 1,variety = False,skip_cfg_above_sigma = None,deliberate_euler_ancestral_bug=None,prefer_brownian=None, characterPrompts = None, text_tag = None, legacy_uc = False,normalize_reference_strength_multiple = False, color_correct = True, director_reference_images = None, director_reference_descriptions = None, director_reference_secondary_strength_values = 1.0, director_reference_strength_values = 1.0, director_reference_information_extracted = None):
 
     params = {
         'params_version':3,
@@ -795,8 +843,10 @@ def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_
         prompt, text_tag = prompt.split(' Text:',1)
     
     if "ddim" in sampler.lower():
-        sampler = "ddim_v3" if isV3 else "ddim"
+        sampler = "k_euler_ancestral" if isV4 else "ddim_v3" if isV3plus else "ddim"
     elif sampler.lower() not in NAI_SAMPLERS: sampler = "k_euler"
+    
+    if isV5: noise_schedule = "karras" # v5 has no noise schedule option, the site always sends karras
     
     if "ddim" in sampler.lower() or not isV3plus: 
         noise_schedule=""
@@ -817,7 +867,10 @@ def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_
     if isV3plus: params['cfg_rescale'] = float(cfg_rescale)
     
     skip_cfg_above_sigma = tryfloat(skip_cfg_above_sigma, 0) or None    
-    params['skip_cfg_above_sigma'] = get_skip_cfg_above_sigma(width, height,model) if variety and not skip_cfg_above_sigma else skip_cfg_above_sigma
+    params['skip_cfg_above_sigma'] = None if isV5 else get_skip_cfg_above_sigma(width, height,model) if variety and not skip_cfg_above_sigma else skip_cfg_above_sigma
+
+    if isV5 and transparent and 'transparent background' not in prompt:
+        prompt = f'{prompt}, transparent background'
 
     if qualityToggle:
         tags = qualPresets.get(model, '')
@@ -881,6 +934,10 @@ def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_
     else:
         action = 'generate'
         
+    if isV5 and (reference_image or director_reference_images): # v5 supports neither vibe transfer nor character reference
+        print("NAI v5 does not support Vibe Transfer or Character Reference, ignoring reference images.")
+        reference_image = director_reference_images = None
+    
     if reference_image is not None and not director_reference_images:
         imgs=[]
         rextracts=[]
@@ -946,6 +1003,8 @@ def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_
             if 'reference_image_multiple' in params: params.pop('reference_image_multiple')
             if 'reference_strength_multiple' in params: params.pop('reference_strength_multiple')
             
+    if isV5 and 'transparent background' in prompt: params['tag_hint_transparent_background'] = True
+    
     params['negative_prompt'] = neg
     params['legacy_v3_extend'] = legacy_v3_extend
     params['scale'] = float(scale)
