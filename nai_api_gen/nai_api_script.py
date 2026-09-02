@@ -278,6 +278,7 @@ class NAIGENScriptBase(scripts.Script):
                     convert_prompts = gr.Dropdown(label="Convert Prompts for NAI ",value="Auto",choices=["Auto","Never","Always"])                   
                 with gr.Row():
                     ucPreset = gr.Radio(label="Negative Preset",value="None",choices=["None","Heavy","Light","Human","Furry"],type="value")
+                    fur_dataset = gr.Checkbox(value=False, label="Fur dataset (adds the tag, forces the Furry negative preset)")
                 with gr.Row():
                     transparent = gr.Checkbox(value=False, label="Transparent Background (v5 only)")
                 with gr.Row():
@@ -314,6 +315,7 @@ class NAIGENScriptBase(scripts.Script):
         # model.change(fn = lambda mod,msg : [gr.update(), gr.update(visible= '4' in mod)], inputs = [model], outputs=[model,charmsg] , show_progress=False)
         self.infotext_fields = [
             (enable, f'{PREFIX} enable'),
+            (fur_dataset, f'{PREFIX} '+ 'fur_dataset'),
             (sampler, f'{PREFIX} sampler'),
             (noise_schedule, f'{PREFIX} noise_schedule'),
             (dynamic_thresholding, f'{PREFIX} dynamic_thresholding'),
@@ -398,7 +400,7 @@ class NAIGENScriptBase(scripts.Script):
         for _, field_name in self.infotext_fields:
             if isinstance(field_name, str): self.paste_field_names.append(field_name)
             
-        return [enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*ref_fields,*vibe_fields4,*vibe_fields]
+        return [enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,fur_dataset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*ref_fields,*vibe_fields4,*vibe_fields]
 
     def vibe_v4_finalize(self,model,vibes_v4, vibe_fields4):
         v3_only_len = len(self.v3_only_ui)
@@ -1232,7 +1234,7 @@ class NAIGENScriptBase(scripts.Script):
             check_path(self.vibe_dir(True))
         return vibe
             
-    def nai_configuration(self,p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*args):
+    def nai_configuration(self,p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,fur_dataset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*args):
         if self.disabled: return        
         DEBUG_LOG(f'nai_configuration')
         
@@ -1302,7 +1304,7 @@ class NAIGENScriptBase(scripts.Script):
         self.strength = getattr(p,"denoising_strength",0)
         
         if do_local_img2img == 1 or do_local_img2img == 2:
-            self.set_local(p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local)
+            self.set_local(p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,fur_dataset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local)
         else:
             p.disable_extra_networks=True
 
@@ -1317,7 +1319,7 @@ class NAIGENScriptBase(scripts.Script):
         p.denoising_strength = self.strength
         p.resize_mode = self.resize_mode
         
-    def set_local(self,p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*args):    
+    def set_local(self,p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,fur_dataset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*args):    
         if nai_resolution_scale> 0:
             p.width = int(p.width * nai_resolution_scale)
         p.height = int(p.height * nai_resolution_scale)
@@ -1334,7 +1336,7 @@ class NAIGENScriptBase(scripts.Script):
         images.save_image(image.copy(), path=shared.opts.outdir_init_images, basename=None, forced_filename=hash, save_to_dirs=False)
         return hash
 
-    def nai_preprocess(self,p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*args):
+    def nai_preprocess(self,p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,fur_dataset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*args):
         if self.disabled: return
         
         self.restore_prompts(p)        
@@ -1695,10 +1697,10 @@ class NAIGENScriptBase(scripts.Script):
         return create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, iteration, batch)
 
 
-    def nai_generate_images(self,p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*args):
+    def nai_generate_images(self,p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,fur_dataset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*args):
         if self.disabled or p.nai_processed is not None: return 
         DEBUG_LOG("nai_generate_images")
-        DEBUG_LOG(enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local)
+        DEBUG_LOG(enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,fur_dataset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local)
         
         isimg2img=self.isimg2img
         do_local_img2img=self.do_local_img2img
@@ -1744,6 +1746,7 @@ class NAIGENScriptBase(scripts.Script):
             p.extra_generation_params[f'{PREFIX} '+ 'smea'] = smea
             p.extra_generation_params[f'{PREFIX} '+ 'qualityToggle'] = qualityToggle
             p.extra_generation_params[f'{PREFIX} '+ 'ucPreset'] = ucPreset
+            if fur_dataset: p.extra_generation_params[f'{PREFIX} '+ 'fur_dataset'] = True
             if transparent: p.extra_generation_params[f'{PREFIX} '+ 'transparent'] = True
             if enhance and enhance != "Off":
                 p.extra_generation_params[f'{PREFIX} '+ 'enhance'] = enhance
@@ -1795,7 +1798,7 @@ class NAIGENScriptBase(scripts.Script):
             if self.augment_mode:
                 return nai_api.AugmentParams('colorize' if self.augment_mode == 'recolorize' else self.augment_mode,image,p.width,p.height,prompt,defry,emotion,seed)
                 
-            return nai_api.NAIGenParams(prompt, neg, seed=seed , width=p.width, height=p.height, scale=p.cfg_scale, sampler = self.sampler_name, steps=p.steps, noise_schedule=self.noise_schedule,sm= "smea" in str(smea).lower(), sm_dyn="dyn" in str(smea).lower(), cfg_rescale=cfg_rescale,uncond_scale=0 ,dynamic_thresholding=dynamic_thresholding,model=model,qualityToggle = qualityToggle == 1, ucPreset = ucPreset , transparent = transparent, noise = extra_noise, image = image, strength= p.denoising_strength,extra_noise_seed = seed if p.subseed_strength <= 0 else int(p.all_subseeds[i]), overlay = False, mask = self.mask if inpaint_mode!=1 else None,legacy_v3_extend=legacy_v3_extend, reference_image=self.reference_image,reference_information_extracted=self.reference_information_extracted,reference_strength=self.reference_strength,n_samples=n_samples,variety=variety,skip_cfg_above_sigma=skip_cfg_above_sigma,deliberate_euler_ancestral_bug=deliberate_euler_ancestral_bug,prefer_brownian=prefer_brownian, characterPrompts=chars,text_tag=text_tag,legacy_uc=legacy_uc,normalize_reference_strength_multiple=self.normalize_reference_strength_multiple, director_reference_images = self.reference_images, director_reference_descriptions=self.reference_captions, director_reference_secondary_strength_values = self.reference_fidelity, director_reference_strength_values = self.reference_strengths)
+            return nai_api.NAIGenParams(prompt, neg, seed=seed , width=p.width, height=p.height, scale=p.cfg_scale, sampler = self.sampler_name, steps=p.steps, noise_schedule=self.noise_schedule,sm= "smea" in str(smea).lower(), sm_dyn="dyn" in str(smea).lower(), cfg_rescale=cfg_rescale,uncond_scale=0 ,dynamic_thresholding=dynamic_thresholding,model=model,qualityToggle = qualityToggle == 1, ucPreset = ucPreset , fur_dataset = fur_dataset, transparent = transparent, noise = extra_noise, image = image, strength= p.denoising_strength,extra_noise_seed = seed if p.subseed_strength <= 0 else int(p.all_subseeds[i]), overlay = False, mask = self.mask if inpaint_mode!=1 else None,legacy_v3_extend=legacy_v3_extend, reference_image=self.reference_image,reference_information_extracted=self.reference_information_extracted,reference_strength=self.reference_strength,n_samples=n_samples,variety=variety,skip_cfg_above_sigma=skip_cfg_above_sigma,deliberate_euler_ancestral_bug=deliberate_euler_ancestral_bug,prefer_brownian=prefer_brownian, characterPrompts=chars,text_tag=text_tag,legacy_uc=legacy_uc,normalize_reference_strength_multiple=self.normalize_reference_strength_multiple, director_reference_images = self.reference_images, director_reference_descriptions=self.reference_captions, director_reference_secondary_strength_values = self.reference_fidelity, director_reference_strength_values = self.reference_strengths)
         
         
         shared.state.job_count = p.n_iter
@@ -1836,7 +1839,7 @@ class NAIGENScriptBase(scripts.Script):
             self.all_prompts = p.all_prompts.copy()
             self.all_negative_prompts = p.all_negative_prompts.copy()
             
-            self.set_local(p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local)
+            self.set_local(p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,fur_dataset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local)
                 
             p.init_images = self.images.copy()
             self.include_nai_init_images_in_results=True

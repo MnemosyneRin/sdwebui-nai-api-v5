@@ -816,7 +816,7 @@ def AugmentParams(mode, image, width, height, prompt, defry, emotion, seed=-1):
     
     return payload
 
-def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_schedule, dynamic_thresholding= False, sm= False, sm_dyn= False, cfg_rescale=0,uncond_scale =1,model =NAIv3 ,image = None, noise=None, strength=None ,extra_noise_seed=None, mask = None,qualityToggle=False,ucPreset = 2,transparent = False,overlay = False,legacy_v3_extend = False,reference_image = None, reference_information_extracted = None , reference_strength = None,n_samples = 1,variety = False,skip_cfg_above_sigma = None,deliberate_euler_ancestral_bug=None,prefer_brownian=None, characterPrompts = None, text_tag = None, legacy_uc = False,normalize_reference_strength_multiple = False, color_correct = True, director_reference_images = None, director_reference_descriptions = None, director_reference_secondary_strength_values = 1.0, director_reference_strength_values = 1.0, director_reference_information_extracted = None):
+def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_schedule, dynamic_thresholding= False, sm= False, sm_dyn= False, cfg_rescale=0,uncond_scale =1,model =NAIv3 ,image = None, noise=None, strength=None ,extra_noise_seed=None, mask = None,qualityToggle=False,ucPreset = 2,fur_dataset = False,transparent = False,overlay = False,legacy_v3_extend = False,reference_image = None, reference_information_extracted = None , reference_strength = None,n_samples = 1,variety = False,skip_cfg_above_sigma = None,deliberate_euler_ancestral_bug=None,prefer_brownian=None, characterPrompts = None, text_tag = None, legacy_uc = False,normalize_reference_strength_multiple = False, color_correct = True, director_reference_images = None, director_reference_descriptions = None, director_reference_secondary_strength_values = 1.0, director_reference_strength_values = 1.0, director_reference_information_extracted = None):
 
     params = {
         'params_version':3,
@@ -871,6 +871,13 @@ def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_
 
     if isV5 and transparent and 'transparent background' not in prompt:
         prompt = f'{prompt}, transparent background'
+
+    if fur_dataset:
+        # NAI's furry switch: the dataset tag leads the prompt and the negative
+        # preset has to match it, or the fur tag fights an anime uc.
+        if 'fur dataset' not in prompt:
+            prompt = f'fur dataset, {prompt}'
+        ucPreset = 'Furry'
 
     if qualityToggle:
         tags = qualPresets.get(model, '')
@@ -1125,7 +1132,7 @@ def parse_prompt_attention(text, weights_only = True):
     
 #(?:(?<=\s)|^)([+-]?[.\d]+)::|
 re_nattention = re.compile(r"""
-(-?\d*\.?\d*)::|
+(-?(?:\d+\.?\d*|\.\d+))::|
 {|
 }|
 \[|
@@ -1197,6 +1204,7 @@ def nai_v4_to_sd(s):
     ws = parse_prompt_nattention(s)    
     txt = ''
     for s,w in ws:
+        s = re.sub(r"(?<!\\)([()])", r"\\\1", s)  # escape literal parenthesis, as prompt_to_a1111 does
         w=f'{w:.5f}'.rstrip('0').rstrip('.')
         txt += s if w=='1' else f'({s}:{w})'
     return txt
