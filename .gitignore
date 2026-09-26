@@ -19,3 +19,6 @@ ui-config.json
 *.key
 *.token
 .env
+
+# Vibe preview images saved by the extension - your own reference images.
+vibe_images/

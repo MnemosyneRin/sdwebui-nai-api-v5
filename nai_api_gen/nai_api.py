@@ -405,6 +405,18 @@ def create_vibe_bundle(vibes):
     }
     return file
 
+_VIBE_ID = re.compile(r'[0-9A-Za-z_-]{1,128}')
+
+def safe_vibe_id(id):
+    """The id if it is safe to use as a file name, otherwise None.
+
+    Vibe ids become file names in the vibe folders. Genuine ones are sha256 hex
+    digests, but an id can arrive from a shared .naiv4vibe file or a PNG chunk,
+    and '..', a slash or a drive letter there would escape the folder - letting
+    a crafted file write or delete images anywhere the webui can reach."""
+    id = str(id or '').strip()
+    return id if _VIBE_ID.fullmatch(id) else None
+
 def create_vibe_file(reference_image, name = None):
     image = None
     if isinstance(reference_image, Image.Image):
@@ -872,7 +884,7 @@ def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_
     if isV5 and transparent and 'transparent background' not in prompt:
         prompt = f'{prompt}, transparent background'
 
-    if fur_dataset:
+    if fur_dataset and isV4:
         # NAI's furry switch: the dataset tag leads the prompt and the negative
         # preset has to match it, or the fur tag fights an anime uc.
         if 'fur dataset' not in prompt:
@@ -896,7 +908,7 @@ def NAIGenParams(prompt, neg, seed, width, height, scale, sampler, steps, noise_
             if 'heavy' in ucPreset: ucPreset = 0
             elif 'light' in ucPreset: ucPreset = 1
             elif 'human' in ucPreset: ucPreset = len(presets) - 1 if len(presets) > 2 else 0
-            elif 'furry' in ucPreset: ucPreset = 2 if len(presets) > 2 else 0
+            elif 'furry' in ucPreset: ucPreset = 2 if len(presets) > 3 else 0
             else: ucPreset = len(presets)
         else: 
             ucPreset = int(ucPreset)

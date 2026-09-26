@@ -104,6 +104,10 @@ class NAIGENScriptBase(scripts.Script):
                 hr = gr.HTML()
                 refresh = ToolButton(ui.refresh_symbol)
                 refresh.click(fn= lambda: self.connect_api(), inputs=[], outputs=[enable,hr])
+                # Re-read Anlas and the V5 usage limit after every NAI generation, the way
+                # the site does. Keyed to the info panel changing, so it costs one request
+                # per generation and nothing while idle.
+                self.on_after_component(lambda c: c.component.change(fn=self.refresh_status_after_gen, inputs=[], outputs=[hr], show_progress="hidden"), elem_id=f"html_info_{elempfx}")
             with gr.Row(visible = is_img2img):
                 do_local_img2img = gr.Dropdown(value=do_local_img2img_modes[0],choices= do_local_img2img_modes,type="index", label="Mode")
                 if is_img2img:
@@ -439,6 +443,11 @@ class NAIGENScriptBase(scripts.Script):
             pass
         return None
     
+    def refresh_status_after_gen(self):
+        if not getattr(self, 'status_stale', False) or self.skip_checks(): return gr.update()
+        self.status_stale = False
+        return self.subscription_status_message()[1]
+
     def connect_api(self):
         s,m = self.subscription_status_message()
         self.api_connected=s
@@ -661,9 +670,10 @@ class NAIGENScriptBase(scripts.Script):
                     js = json.load(BytesIO(f))
                     if not js: return False
                     type = js.get("identifier",None)
-                    if type == "novelai-vibe-transfer": vibes[js['id']]=js
-                    elif type == "novelai-vibe-transfer-bundle":
-                        for v in js.get("vibes",[]): vibes[v['id']]= v
+                    found = [js] if type == "novelai-vibe-transfer" else js.get("vibes",[]) if type == "novelai-vibe-transfer-bundle" else []
+                    for v in found:
+                        if isinstance(v, dict) and nai_api.safe_vibe_id(v.get('id')): vibes[v['id']] = v
+                        else: print("Skipped a vibe with a missing or unsafe id")
                     return True                        
                 except ValueError as e:
                     # print("ValueError reading VibeFile JS",e)
@@ -716,7 +726,8 @@ class NAIGENScriptBase(scripts.Script):
                 if not vibe_name: return message, gr.update(), *fields
                 v = self.find_vibe_file(vibe_name)
                 if not v: return "Vibe File Not Found", gr.update(), *fields
-                id = v['id']
+                id = nai_api.safe_vibe_id(v.get('id'))
+                if not id: return "Refusing to delete: unsafe vibe id", gr.update(), *fields
                 
                 for i in range(len(ids)):
                     if ids[i] == id: ids[i] = ""
@@ -837,7 +848,7 @@ class NAIGENScriptBase(scripts.Script):
                             image = Image.open(BytesIO(base64.b64decode(v['image'].encode())))
                             pnginfo = PngImagePlugin.PngInfo()
                             pnginfo.add_text('naidata', base64.b64encode(json.dumps(v).encode()).decode("utf-8"))
-                            t = tempfile.NamedTemporaryFile(delete=False, prefix=name, suffix=".png")
+                            t = tempfile.NamedTemporaryFile(delete=False, prefix=self.preview_file_name(name or ""), suffix=".png")
                             image.save(t,format='PNG',pnginfo=pnginfo)
                             paths.append(t.name)                        
                         except Exception: files.append((name,v))                    
@@ -848,14 +859,14 @@ class NAIGENScriptBase(scripts.Script):
                     else:
                         pnginfo = PngImagePlugin.PngInfo()
                         pnginfo.add_text('naidata', base64.b64encode(json.dumps(bundle).encode()).decode("utf-8"))
-                        t = tempfile.NamedTemporaryFile(delete=False, prefix=name, suffix=".naiv4vibebundle.png")
+                        t = tempfile.NamedTemporaryFile(delete=False, prefix=self.preview_file_name(name or ""), suffix=".naiv4vibebundle.png")
                         embed_image.convert("RGBA").save(t, format='PNG', pnginfo=pnginfo)
                         paths.append(t.name)
                 case _:
                     return message, gr.update(), *fields
                     
             for name, file in files:
-                t = tempfile.NamedTemporaryFile(delete=False, prefix=name, suffix=".naiv4vibebundle")
+                t = tempfile.NamedTemporaryFile(delete=False, prefix=self.preview_file_name(name or ""), suffix=".naiv4vibebundle")
                 t.write(json.dumps(file).encode())
                 paths.append(t.name)
                 
@@ -1087,7 +1098,8 @@ class NAIGENScriptBase(scripts.Script):
     def save_vibe_images(self,dest):
         type = dest["type"]
         name = dest.get("name","")
-        id = dest.get("id","")
+        id = nai_api.safe_vibe_id(dest.get("id"))
+        if not id: return
         if 'image' in dest and type != 'encoding' and name:
             format = Image.registered_extensions()['.png']
             path = os.path.join(self.vibe_preview_dir(), f"{self.preview_file_name(name)} .{id}.png")
@@ -1104,9 +1116,9 @@ class NAIGENScriptBase(scripts.Script):
                 prev.save(path,format=format,pnginfo=pnginfo)
         
     def update_vibe_file(self, vibe):
-        id = vibe.get("id","")
+        id = nai_api.safe_vibe_id(vibe.get("id"))
         if not id: 
-            print ("No ID!")
+            print ("Vibe has a missing or unsafe id, not saved.")
             return vibe
         is_encoding = vibe["type"] == 'encoding'
         dest = self.load_vibe_file_by_id(id)        
@@ -1128,6 +1140,10 @@ class NAIGENScriptBase(scripts.Script):
         return dest
         
     def rename_vibe_file(self, id, newname, model = None, ie = None, st= None):
+        id = nai_api.safe_vibe_id(id)
+        if not id:
+            print("Could Not Rename: unsafe vibe id")
+            return
         if not newname: newname = f"{id[:6]}-{id[-6:]}"
         dest = self.load_vibe_file_by_id(id)
         if not dest:
@@ -1169,7 +1185,8 @@ class NAIGENScriptBase(scripts.Script):
             return json.loads(file.read())
     
     def find_vibe_path_by_id(self, id):
-        id = id.strip()
+        id = nai_api.safe_vibe_id(id)
+        if not id: return None
         path = os.path.join(self.vibe_dir(), id + '.naiv4vibe')
         if os.path.exists(path): return path
         path2 = os.path.join(self.vibe_dir(True), id + '.naiv4vibe')
@@ -1700,6 +1717,7 @@ class NAIGENScriptBase(scripts.Script):
     def nai_generate_images(self,p,enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,fur_dataset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local,*args):
         if self.disabled or p.nai_processed is not None: return 
         DEBUG_LOG("nai_generate_images")
+        self.status_stale = True   # this generation spends Anlas / V5 usage; refresh the label afterwards
         DEBUG_LOG(enable,convert_prompts,cost_limiter,nai_post,disable_smea_in_post,model,sampler,noise_schedule,dynamic_thresholding,variety,smea,cfg_rescale,skip_cfg_above_sigma,qualityToggle,ucPreset,fur_dataset,do_local_img2img,extra_noise,inpaint_mode,nai_resolution_scale,nai_cfg,nai_steps,nai_denoise_strength,legacy_v3_extend,augment_mode,defry,emotion,reclrLvlLo,reclrLvlHi,reclrLvlMid,reclrLvlLoOut,reclrLvlHiOut,reclrLvlAlpha,deliberate_euler_ancestral_bug,prefer_brownian,legacy_uc,normalize_reference_strength_multiple,normalize_negatives,normalize_level,cref_image,cref_style,cref_fidel,transparent,enhance,enhance_magnitude,keep_mask_for_local)
         
         isimg2img=self.isimg2img
@@ -1909,6 +1927,9 @@ class NAIGENScriptBase(scripts.Script):
             image = self.images[i]
             if image is None or getattr(image, 'is_transient_image', False): continue
             params = nai_api.NAIEnhanceParams(getparams(i), image, enhance, magnitude, seed = int(p.all_seeds[i]))
+            if params['parameters'].get('upscaled_enhance') and not str(params.get('model','')).startswith('nai-diffusion-5'):
+                self.comment(p, "Enhance Max is only available on V5 models; skipped. Use 1.5x or 2x.")
+                return
             w, h = params['parameters']['width'], params['parameters']['height']
             if w * h > nai_api.MAX_ENHANCE_PIXELS:
                 self.comment(p, f"Enhance skipped for image {i+1}: {w}x{h} is above NAI's {nai_api.MAX_ENHANCE_PIXELS} pixel ceiling.")

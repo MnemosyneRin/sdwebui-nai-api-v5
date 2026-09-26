@@ -163,7 +163,8 @@ To stay inside the free allowance a generation must be at or under 1024x1024
 (1,048,576 pixels), at or under 28 steps, and use no character reference.
 "Force Opus Free Gen Limits" in Options enforces this for you, and will also fall
 back to V4.5 automatically when your V5 usage hits zero. The status line next to
-the API key shows your remaining V5 usage percentage.
+the Enable box shows your Anlas and remaining V5 usage percentage, and refreshes
+itself after every NAI generation, the way the site does.
 
 A practical habit from heavy users: switch to V4.5 for inpainting to conserve
 V5 allowance.
@@ -192,6 +193,22 @@ cells or form fields. Anyone you share the notebook with gets them.
 Works on A1111, Forge, ReForge and Forge-Neo. Forge-Neo removed the old
 modules.generation_parameters_copypaste alias that other forks still provide;
 the extension now falls back to modules.infotext_utils there.
+
+
+KEEPING YOUR KEY SAFE
+---------------------
+Every webui setting - your API key included - is sent to any browser that opens
+the webui, and returned by /sdapi/v1/options. Run locally, that is only you.
+Behind --share, --ngrok or --listen without --gradio-auth, or --api without
+--api-auth, it is anyone who can reach the link. The extension prints a warning
+at startup when that applies. The fix is the NAI_API_KEY environment variable
+(or Colab secret): it never enters Settings, so it is never sent anywhere.
+
+The key field in Settings is masked, so it does not show up in screenshots.
+
+Vibe files and images can come from anyone. A vibe's id is used as a file name,
+so ids that are not plain letters, digits, '-' or '_' are refused - a crafted
+vibe can no longer write or delete files outside the vibe folders.
 
 
 TROUBLESHOOTING
