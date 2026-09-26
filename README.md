@@ -52,6 +52,15 @@ Checked against NovelAI's current web client:
 - Vibe Transfer and Character Reference dropped with a warning on V5 - NovelAI has not shipped them
   for this model yet, so sending them would only produce an API error.
 
+### No local model in VRAM
+A NovelAI generation happens on NovelAI's servers, but the webui still loads a local
+checkpoint - at startup on A1111/reForge, and on the first Generate on Forge Neo. Now
+nothing is loaded until a generation actually needs local weights, so NAI-only sessions
+(and Colab) use no VRAM for a model. A local generation still loads the checkpoint
+normally the first time it needs it. Toggle under Settings -> NAI API Generator
+(restart to apply). If the standalone `sd-webui-no-local-model` extension is installed,
+it keeps the job and this stands down.
+
 ### Fixes
 - Handles the `retry` event NovelAI's generation stream now emits, instead of logging it as an unknown
   event and letting it contaminate unrelated error messages.

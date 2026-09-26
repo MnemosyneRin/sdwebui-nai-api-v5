@@ -14,6 +14,8 @@ def on_ui_settings():
     addopt('nai_api_key', shared.OptionInfo('', "NAI API Key - See https://docs.sillytavern.app/usage/api-connections/novelai/ . Leave blank to use the NAI_API_KEY environment variable, or a Colab secret of that name.", gr.Textbox, {"type": "password"}, section=section))
     warn_if_key_exposed()
     
+    addopt('nai_api_lazy_model', shared.OptionInfo(True, "Don't load a local checkpoint until a generation actually needs one. NAI-only sessions then use no VRAM for a model. Restart the webui to apply.", gr.Checkbox, section=section).needs_restart())
+
     addopt('nai_api_skip_checks', shared.OptionInfo(False, "Skip NAI account/subscription/Anlas checks.",gr.Checkbox, section=section))
     
     addopt('nai_api_preview', shared.OptionInfo(True, "Stream preview images during generation.",gr.Checkbox, section=section))
@@ -81,21 +83,37 @@ def on_ui_settings():
 
     addopt('nai_alt_action_tag', shared.OptionInfo('::', "Alternate Action Tag - When used in character prompts, will be replaced with '#'. Workaround for NAI's action tag syntax ('target#pointing') conflicting with sdwebui's Prompt Comment feature, which uses '#' to start comments, breaking '#' action tags. Leave empty to disable.", gr.Text, section=section))
         
+def key_exposed_to(o, environ=None, modules=None):
+    """Who besides you can read the key, as a list of reasons - empty if nobody.
+
+    Every setting is sent to any browser that opens the webui and returned by
+    GET /sdapi/v1/options, so the question is who can reach the server. --api on
+    its own still binds to 127.0.0.1; it only matters alongside something that
+    publishes the server. Colab counts as published: notebooks reach the webui
+    through their own tunnels, which never show up as webui flags."""
+    import os, sys
+    environ = os.environ if environ is None else environ
+    modules = sys.modules if modules is None else modules
+    public = [f'--{f}' for f in ('share', 'ngrok', 'listen') if getattr(o, f, None)]
+    if environ.get('COLAB_RELEASE_TAG') or 'google.colab' in modules:
+        public.append('Colab')
+    if not public:
+        return []
+    reasons = []
+    if not getattr(o, 'gradio_auth', None):
+        reasons.append(', '.join(public))
+    if (getattr(o, 'api', False) or getattr(o, 'nowebui', False)) and not getattr(o, 'api_auth', None):
+        reasons.append('the API without --api-auth')
+    return reasons
+
 def warn_if_key_exposed():
-    """Every setting - this key included - is sent to any browser that opens the
-    webui, and returned by GET /sdapi/v1/options. Run locally that is only you.
-    Behind --share, --ngrok or --listen without --gradio-auth, or --api without
-    --api-auth, it is anyone who can reach it. The env var never enters settings."""
     try:
-        o = shared.cmd_opts
         if not shared.opts.data.get('nai_api_key'): return
-        open_to = [f'--{f}' for f in ('share', 'ngrok', 'listen') if getattr(o, f, None)] if not getattr(o, 'gradio_auth', None) else []
-        if (getattr(o, 'api', False) or getattr(o, 'nowebui', False)) and not getattr(o, 'api_auth', None):
-            open_to.append('--api without --api-auth')
-        if open_to:
-            print(f"NAI API: WARNING - your NovelAI key is saved in Settings and this webui is reachable by others "
-                  f"({', '.join(open_to)}). Anyone who can open it can read the key. Clear the Settings field and "
-                  f"set the NAI_API_KEY environment variable instead, or add authentication.")
+        reasons = key_exposed_to(shared.cmd_opts)
+        if reasons:
+            print(f"NAI API: WARNING - your NovelAI key is saved in Settings and others can reach this webui "
+                  f"({'; '.join(reasons)}). Anyone who can open it can read the key. Clear the Settings field and "
+                  f"set the NAI_API_KEY environment variable (or a Colab secret) instead, or add authentication.")
     except Exception:
         pass
 

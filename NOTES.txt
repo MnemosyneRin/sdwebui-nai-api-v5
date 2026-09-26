@@ -195,13 +195,30 @@ modules.generation_parameters_copypaste alias that other forks still provide;
 the extension now falls back to modules.infotext_utils there.
 
 
+NO LOCAL MODEL IN VRAM
+----------------------
+A NovelAI generation runs on NovelAI's servers, yet the webui normally loads a local
+checkpoint anyway - reForge/A1111 at startup, Forge Neo on the first Generate. The
+extension now stops that: nothing loads until a generation genuinely needs local
+weights. A NAI-only session, including Colab, uses no VRAM for a model, and a local
+generation still loads the checkpoint the first time it is needed.
+
+Settings > NAI API Generator > "Don't load a local checkpoint until a generation
+actually needs one". On by default; restart the webui after changing it.
+
+If you also have the standalone sd-webui-no-local-model extension installed, it keeps
+the job and the built-in one stands down. Remove one of them - the built-in one does
+the same thing.
+
+
 KEEPING YOUR KEY SAFE
 ---------------------
 Every webui setting - your API key included - is sent to any browser that opens
 the webui, and returned by /sdapi/v1/options. Run locally, that is only you.
-Behind --share, --ngrok or --listen without --gradio-auth, or --api without
---api-auth, it is anyone who can reach the link. The extension prints a warning
-at startup when that applies. The fix is the NAI_API_KEY environment variable
+Behind --share, --ngrok or --listen without --gradio-auth, or with --api on
+top of those without --api-auth, it is anyone who can reach the link. Colab
+always counts: notebooks publish the webui through their own tunnels. The
+extension prints a warning at startup when any of that applies. The fix is the NAI_API_KEY environment variable
 (or Colab secret): it never enters Settings, so it is never sent anywhere.
 
 The key field in Settings is masked, so it does not show up in screenshots.
